@@ -1092,6 +1092,13 @@
     <string name="no_species_yet">No species yet.</string>
     <string name="no_identifications_yet">No identifications yet.</string>
     <string name="sort_by">Sort By</string>
+    <string-array name="explore_geoprivacy_items">
+        <item>@string/any</item>
+        <item>@string/geoprivacy_open</item>
+        <item>@string/geoprivacy_obscured</item>
+        <item>@string/geoprivacy_private</item>
+        <item>@string/geoprivacy_obscured_or_private</item>
+    </string-array>
     <string-array name="explore_order_by_items">
         <item>Date Added</item>
         <item>Date Observed</item>
@@ -1108,6 +1115,16 @@
     <string name="sorted_by_full">Sorted by %1$s (%2$s)</string>
     <!-- Label for an observation search filter to exclude your own observations -->
     <string name="hide_my_observations">Hide My Observations</string>
+    <!-- Label for an observation search filter that hides observations a given user has identified -->
+    <string name="not_identified_by_user">Not identified by user</string>
+    <string name="remove_without_ident_user_filter">Remove not-identified-by filter</string>
+    <!-- Label for an observation search filter on the geoprivacy applied because of a taxon's conservation status -->
+    <string name="taxon_geoprivacy">Taxon Geoprivacy</string>
+    <string name="taxon_geoprivacy_with_value">Taxon Geoprivacy: %1$s</string>
+    <string name="geoprivacy_open">Open</string>
+    <string name="geoprivacy_obscured">Obscured</string>
+    <string name="geoprivacy_private">Private</string>
+    <string name="geoprivacy_obscured_or_private">Obscured or Private</string>
     <!-- Label for an option to follow an observation, i.e. subscribe to future updates -->
     <string name="follow_this_observation">Follow this Observation</string>
     <!-- Label for an option to unfollow an observation, i.e. unsubscribe to future updates -->
@@ -1119,6 +1136,39 @@
     <!-- Label for a button to copy the coordinates of an observation -->
     <string name="copy_coordinates">Copy coordinates</string>
     <string name="coordinates_copied_to_clipboard">Coordinates copied to clipboard</string>
+    <string name="elevation_copied_to_clipboard">Elevation copied to clipboard</string>
+    <!-- Top bar button that shows the app chooser to open the current page with another app -->
+    <string name="open_in_original_inaturalist">Open with…</string>
+    <string name="original_inaturalist_not_installed">No app found to open this link</string>
+    <!-- Map popup that shows the elevation (height above sea level) of a point on the map. %1$s is e.g. "1,234 m" -->
+    <string name="map_popup_elevation">Elevation: %1$s</string>
+    <string name="map_popup_elevation_loading">Elevation: …</string>
+    <string name="map_popup_elevation_unavailable">Elevation: unavailable</string>
+    <string name="map_popup_close">Close</string>
+    <!-- Shown in the top bar of the location screen. %1$s is the elevation, e.g. "1,234 m" -->
+    <string name="location_elevation">Elev: %1$s</string>
+    <!-- Explore filters screen: shows the full search URL, which can be copied or edited by hand -->
+    <string name="search_url">Search URL (editable)</string>
+    <string name="copy_url">Copy URL</string>
+    <string name="url_copied_to_clipboard">URL copied to clipboard</string>
+    <!-- Filter for the maximum positional accuracy of an observation's coordinates, in meters -->
+    <string name="max_coordinate_accuracy">Coordinate precision limit (meters)</string>
+    <string name="no_limit">No limit</string>
+    <string name="max_coordinate_accuracy_with_value">Precision ≤ %1$s m</string>
+    <!-- Filter for observations that were created using a specific app (OAuth application) -->
+    <string name="oauth_application_id">Created with app</string>
+    <string name="oauth_application_id_with_value">App: %1$s</string>
+    <string name="oauth_app_inaturalist_android">iNaturalist Android app</string>
+    <string name="oauth_app_inaturalist_ios">iNaturalist iOS app</string>
+    <string name="oauth_app_seek">Seek app</string>
+    <string name="oauth_app_inaturalist_next">iNaturalist Next app</string>
+    <string-array name="explore_oauth_app_items">
+        <item>@string/any</item>
+        <item>@string/oauth_app_inaturalist_android</item>
+        <item>@string/oauth_app_inaturalist_ios</item>
+        <item>@string/oauth_app_seek</item>
+        <item>@string/oauth_app_inaturalist_next</item>
+    </string-array>
     <!--  Title of a section on the observation detail view that displays minor metadata  -->
     <string name="metadata">Metadata</string>
     <!--  iNat observation identifier  -->

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 	<!-- Resources that should not be translated / renamed -->
-	<string name="app_title">iNaturalist</string>
+	<string name="app_title">iNaturalist mod</string>
     <string-array name="default_obs_action_values">
         <item>show_options</item>
         <item>take_photo</item>
@@ -18,6 +18,20 @@
 	<string-array name="explore_order_values">
 		<item>desc</item>
 		<item>asc</item>
+	</string-array>
+	<string-array name="explore_oauth_app_values">
+		<item></item>
+		<item>2</item>
+		<item>3</item>
+		<item>333</item>
+		<item>843</item>
+	</string-array>
+	<string-array name="explore_geoprivacy_values">
+		<item></item>
+		<item>open</item>
+		<item>obscured</item>
+		<item>private</item>
+		<item>obscured_private</item>
 	</string-array>
 	<string-array name="explore_order_by_values">
 		<item>created_at</item>

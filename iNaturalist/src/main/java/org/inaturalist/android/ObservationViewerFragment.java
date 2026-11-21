@@ -107,6 +107,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -2397,14 +2398,9 @@ public class ObservationViewerFragment extends Fragment implements AnnotationsAd
 
     private String formatObservedOn(Timestamp date, Timestamp time, String observedOnString) {
         BetterJSONObject observation = mObsJson != null ? new BetterJSONObject(mObsJson) : null;
-        // Only show month/year for observations that you don't own + obscured/private
-        String currentUser = mApp.currentUserLogin();
-        boolean obsByUser = observation != null &&
-                currentUser != null &&
-                observation.getJSONObject("user") != null &&
-                observation.getJSONObject("user").optString("login", "").equals(currentUser);
-        boolean isPrivateOrObscured = false;
 
+        // The observation's date and time are public even when the location is obscured/private,
+        // so always show the full date and time (time_observed_at) - never just month/year.
 
         // Prefer the time string, if available, since it's in local time zone.
         Date parsedTime = null;
@@ -2416,27 +2412,17 @@ public class ObservationViewerFragment extends Fragment implements AnnotationsAd
             }
         }
 
+        // Time zone to use for time_observed_at, when observed_on_string isn't available
+        // (e.g. it's hidden on obscured observations). Falls back to the device's time zone.
+        TimeZone observedTimeZone = null;
         if (observation != null) {
-            if (observation.getString("geoprivacy") != null) {
-                if (observation.getString("geoprivacy").equals("private") ||
-                        observation.getString("geoprivacy").equals("obscured")) {
-                    isPrivateOrObscured = true;
-                }
+            String tzId = observation.getString("observed_time_zone");
+            if ((tzId == null) || (tzId.length() == 0)) tzId = observation.getString("time_zone");
+            if ((tzId != null) && (tzId.length() > 0)) {
+                TimeZone tz = TimeZone.getTimeZone(tzId);
+                // getTimeZone returns GMT for unknown IDs - only accept an exact match
+                if (tz.getID().equals(tzId)) observedTimeZone = tz;
             }
-            if (observation.getString("taxon_geoprivacy") != null) {
-                if (observation.getString("taxon_geoprivacy").equals("private") ||
-                        observation.getString("taxon_geoprivacy").equals("obscured")) {
-                    isPrivateOrObscured = true;
-                }
-            }
-        }
-
-        boolean isObscured = !obsByUser && isPrivateOrObscured;
-
-        if (isObscured && date != null) {
-            // Only show month+year for obscured observations
-            FastDateFormat dateFormat = FastDateFormat.getInstance(getString(R.string.date_obscured), getResources().getConfiguration().locale);
-            return dateFormat.format(new Date(date.getTime()));
         }
 
         StringBuilder format = new StringBuilder();
@@ -2464,6 +2450,7 @@ public class ObservationViewerFragment extends Fragment implements AnnotationsAd
             }
 
             SimpleDateFormat dateFormat = new SimpleDateFormat(dateFormatString);
+            if ((parsedTime == null) && (observedTimeZone != null)) dateFormat.setTimeZone(observedTimeZone);
             format.append(dateFormat.format(date));
         }
 
@@ -2480,6 +2467,7 @@ public class ObservationViewerFragment extends Fragment implements AnnotationsAd
                 timeFormatString = getString(R.string.time_short_12_hour);
             }
             SimpleDateFormat timeFormat = new SimpleDateFormat(timeFormatString);
+            if ((parsedTime == null) && (observedTimeZone != null)) timeFormat.setTimeZone(observedTimeZone);
 
             if (parsedTime != null) {
                 format.append(timeFormat.format(parsedTime));
@@ -2498,6 +2486,21 @@ public class ObservationViewerFragment extends Fragment implements AnnotationsAd
         switch (item.getItemId()) {
             case android.R.id.home:
                 getActivity().finish();
+                return true;
+            case R.id.open_in_original_app:
+                // The observation can come from the local DB or (e.g. when opened from a link) only from JSON
+                Integer openObsId = (mObservation != null) ? mObservation.id : null;
+                if ((openObsId == null) && (mObsJson != null)) {
+                    try {
+                        int jsonId = new org.json.JSONObject(mObsJson).optInt("id", 0);
+                        if (jsonId > 0) openObsId = jsonId;
+                    } catch (org.json.JSONException e) {
+                        // Invalid JSON - leave the id unset
+                    }
+                }
+                if (openObsId != null) {
+                    OriginalAppUtils.openObservationInOriginalApp(getActivity(), openObsId);
+                }
                 return true;
             case R.id.edit_observation:
                 intent = new Intent(Intent.ACTION_EDIT, mUri, getActivity(), ObservationEditorSlider.class);
@@ -2587,6 +2590,10 @@ public class ObservationViewerFragment extends Fragment implements AnnotationsAd
         MenuItem duplicate = mMenu.findItem(R.id.duplicate);
         MenuItem edit = mMenu.findItem(R.id.edit_observation);
         MenuItem follow = mMenu.findItem(R.id.follow_observation);
+        MenuItem openInOriginalApp = mMenu.findItem(R.id.open_in_original_app);
+
+        // Always show the "open with" button, however the observation page was opened
+        openInOriginalApp.setVisible(true);
 
         if (mReadOnly) {
             edit.setVisible(false);

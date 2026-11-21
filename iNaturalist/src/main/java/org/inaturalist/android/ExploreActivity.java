@@ -130,6 +130,7 @@ public class ExploreActivity extends BaseFragmentActivity {
     private GridViewExtended mObservationsGrid;
     private ObservationGridAdapter mGridAdapter;
     private GoogleMap mObservationsMap;
+    private MapCoordinatePopup mCoordinatePopup;
     private ViewGroup mObservationsMapContainer;
     private View mMapHide;
     private TextView mObservationsGridFilterBar;
@@ -853,6 +854,50 @@ public class ExploreActivity extends BaseFragmentActivity {
             builder.append(", ");
         }
 
+        if (mSearchFilters.maxPositionalAccuracy != null) {
+            builder.append(String.format(getString(R.string.max_coordinate_accuracy_with_value), String.valueOf(mSearchFilters.maxPositionalAccuracy)));
+            builder.append(", ");
+        }
+
+        if (mSearchFilters.oauthApplicationId != null) {
+            List<String> appValues = Arrays.asList(getResources().getStringArray(R.array.explore_oauth_app_values));
+            int appIdx = appValues.indexOf(String.valueOf(mSearchFilters.oauthApplicationId));
+            String appName = appIdx > 0 ? getResources().getStringArray(R.array.explore_oauth_app_items)[appIdx] : String.valueOf(mSearchFilters.oauthApplicationId);
+            builder.append(String.format(getString(R.string.oauth_application_id_with_value), appName));
+            builder.append(", ");
+        }
+
+        if ((mSearchFilters.extraParams != null) && !mSearchFilters.extraParams.isEmpty()) {
+            for (String key : mSearchFilters.extraParams.keySet()) {
+                builder.append(key);
+                builder.append(", ");
+            }
+        }
+
+        if (mSearchFilters.withoutIdentUser != null) {
+            builder.append(getString(R.string.not_identified_by_user));
+            builder.append(": ");
+            builder.append(mSearchFilters.withoutIdentUser.optString("login"));
+            builder.append(", ");
+        }
+
+        List<String> geoprivacyValues = Arrays.asList(getResources().getStringArray(R.array.explore_geoprivacy_values));
+        List<String> geoprivacyLabels = Arrays.asList(getResources().getStringArray(R.array.explore_geoprivacy_items));
+        if (mSearchFilters.geoprivacy != null) {
+            int idx = geoprivacyValues.indexOf(mSearchFilters.geoprivacy);
+            if (idx > 0) {
+                builder.append(String.format(getString(R.string.geoprivacy_with_value), geoprivacyLabels.get(idx)));
+                builder.append(", ");
+            }
+        }
+        if (mSearchFilters.taxonGeoprivacy != null) {
+            int idx = geoprivacyValues.indexOf(mSearchFilters.taxonGeoprivacy);
+            if (idx > 0) {
+                builder.append(String.format(getString(R.string.taxon_geoprivacy_with_value), geoprivacyLabels.get(idx)));
+                builder.append(", ");
+            }
+        }
+
         if ((mSearchFilters.orderBy != null) && (mSearchFilters.order != null)) {
             List<String> sortByValues = Arrays.asList(getResources().getStringArray(R.array.explore_order_by_values));
             List<String> sortValues = Arrays.asList(getResources().getStringArray(R.array.explore_order_values));
@@ -1373,10 +1418,24 @@ public class ExploreActivity extends BaseFragmentActivity {
                         Logger.tag(TAG).debug("onMapReady");
 
                         mObservationsMap = googleMap;
+                        mCoordinatePopup = null; // Bound to the previous map instance (if any)
                         mObservationsMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
                             @Override
                             public void onMapClick(LatLng latLng) {
                                 onObservationsMapClick(latLng);
+                            }
+                        });
+
+                        // Long press on the map shows a draggable popup with the coordinates + elevation
+                        mObservationsMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
+                            @Override
+                            public void onMapLongClick(LatLng latLng) {
+                                if (mObservationsMapContainer == null) return;
+
+                                if (mCoordinatePopup == null) {
+                                    mCoordinatePopup = new MapCoordinatePopup(ExploreActivity.this, mObservationsMap, mObservationsMapContainer);
+                                }
+                                mCoordinatePopup.show(latLng);
                             }
                         });
 
@@ -1405,6 +1464,8 @@ public class ExploreActivity extends BaseFragmentActivity {
                         mObservationsMap.setOnCameraMoveListener(new GoogleMap.OnCameraMoveListener() {
                             @Override
                             public void onCameraMove() {
+                                if (mCoordinatePopup != null) mCoordinatePopup.onCameraMove();
+
                                 // User moved the map view - allow him to make a new search on those new map bounds
                                 if ((mLastMapBounds == null) || (!mLastMapBounds.equals(mObservationsMap.getProjection().getVisibleRegion().latLngBounds))) {
                                     mMapMoved = true;

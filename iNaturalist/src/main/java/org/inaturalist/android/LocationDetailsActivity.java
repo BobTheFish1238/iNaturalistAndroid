@@ -16,6 +16,7 @@ import android.util.DisplayMetrics;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -45,6 +46,9 @@ public class LocationDetailsActivity extends AppCompatActivity implements Locati
 	private LocationManager mLocationManager;
 	@State public double mAccuracy;
     private TextView mLocationCoordinates;
+    private Double mElevation;
+    private boolean mElevationRequested = false;
+    private MapCoordinatePopup mCoordinatePopup;
     @State public Observation mObservation;
     private BetterJSONObject mObservationJson;
     @State public boolean mIsReadOnly;
@@ -126,20 +130,72 @@ public class LocationDetailsActivity extends AppCompatActivity implements Locati
 
             if (mMap != null) mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(location, zoom), 1, null);
 
-            if (mAccuracy == 0) {
-                 mLocationCoordinates.setText(String.format(getString(R.string.location_coords_no_acc),
-                        String.format("%.5f...", mLatitude),
-                        String.format("%.5f...", mLongitude)));
-            } else {
-                mLocationCoordinates.setText(String.format(getString(R.string.location_coords),
-                        String.format("%.5f...", mLatitude),
-                        String.format("%.5f...", mLongitude),
-                        mAccuracy > 999 ? ">1 km" : String.format("%dm", (int) mAccuracy)));
-            }
+            refreshCoordinatesText();
+            fetchElevationIfPublic();
         } else {
 
         }
         
+    }
+
+    // Updates the top bar with the coordinates, accuracy and (if known) elevation
+    private void refreshCoordinatesText() {
+        if ((mLatitude == null) || (mLongitude == null)) return;
+
+        String text;
+        if (mAccuracy == 0) {
+            text = String.format(getString(R.string.location_coords_no_acc),
+                    String.format("%.5f...", mLatitude),
+                    String.format("%.5f...", mLongitude));
+        } else {
+            text = String.format(getString(R.string.location_coords),
+                    String.format("%.5f...", mLatitude),
+                    String.format("%.5f...", mLongitude),
+                    mAccuracy > 999 ? ">1 km" : String.format("%dm", (int) mAccuracy));
+        }
+
+        if (mElevation != null) {
+            text += "  " + String.format(getString(R.string.location_elevation), ElevationUtils.format(mElevation));
+        }
+
+        mLocationCoordinates.setText(text);
+    }
+
+    // The elevation is only shown when the observation's location is public (open geoprivacy,
+    // both for the observation and its taxon) - otherwise it'd reveal info about the true location
+    private boolean isLocationPublic() {
+        if (mObservation == null) return false;
+        if (mObservation.private_latitude != null) return false;
+
+        String geoprivacy = mObservation.geoprivacy;
+        String taxonGeoprivacy = mObservation.taxon_geoprivacy;
+
+        if (mObservationJson != null) {
+            if (mObservationJson.getString("geoprivacy") != null) geoprivacy = mObservationJson.getString("geoprivacy");
+            if (mObservationJson.getString("taxon_geoprivacy") != null) taxonGeoprivacy = mObservationJson.getString("taxon_geoprivacy");
+        }
+
+        boolean isOpen = (geoprivacy == null) || geoprivacy.isEmpty() || geoprivacy.equals("open");
+        boolean isTaxonOpen = (taxonGeoprivacy == null) || taxonGeoprivacy.isEmpty() || taxonGeoprivacy.equals("open");
+
+        return isOpen && isTaxonOpen;
+    }
+
+    private void fetchElevationIfPublic() {
+        if (mElevationRequested) return;
+        if ((mLatitude == null) || (mLongitude == null)) return;
+        if (!isLocationPublic()) return;
+
+        mElevationRequested = true;
+        ElevationUtils.getElevation(mLatitude, mLongitude, new ElevationUtils.Callback() {
+            @Override
+            public void onElevation(Double elevationMeters) {
+                if (isFinishing()) return;
+
+                mElevation = elevationMeters;
+                refreshCoordinatesText();
+            }
+        });
     }
 
     @Override
@@ -238,6 +294,26 @@ public class LocationDetailsActivity extends AppCompatActivity implements Locati
                         mMap.clear();
 
                         mHelper.addMapPosition(mMap, mObservation, mObservationJson);
+
+                        // Long press shows a draggable popup with the coordinates + elevation of that point
+                        mMap.setOnMapLongClickListener(new GoogleMap.OnMapLongClickListener() {
+                            @Override
+                            public void onMapLongClick(LatLng latLng) {
+                                ViewGroup container = (ViewGroup) findViewById(R.id.map_container);
+                                if (container == null) return;
+
+                                if (mCoordinatePopup == null) {
+                                    mCoordinatePopup = new MapCoordinatePopup(LocationDetailsActivity.this, mMap, container);
+                                }
+                                mCoordinatePopup.show(latLng);
+                            }
+                        });
+                        mMap.setOnCameraMoveListener(new GoogleMap.OnCameraMoveListener() {
+                            @Override
+                            public void onCameraMove() {
+                                if (mCoordinatePopup != null) mCoordinatePopup.onCameraMove();
+                            }
+                        });
 
                         zoomToLocation();
                     }

@@ -34,6 +34,10 @@ import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.Toast;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.widget.DatePicker;
 import android.widget.ImageView;
 import android.widget.RadioButton;
@@ -71,6 +75,7 @@ public class ExploreFiltersActivity extends AppCompatActivity {
 
     private static final int REQUEST_CODE_SEARCH_PROJECTS = 0x1000;
     private static final int REQUEST_CODE_SEARCH_USERS = 0x1001;
+    private static final int REQUEST_CODE_SEARCH_WITHOUT_IDENT_USERS = 0x1002;
     private static final String TAG = "ExploreFiltersActivity";
 
     private INaturalistApp mApp;
@@ -92,6 +97,17 @@ public class ExploreFiltersActivity extends AppCompatActivity {
     private ImageView mUserPic;
     private TextView mUserName;
     private ImageView mClearUser;
+    private ImageView mWithoutIdentUserPic;
+    private TextView mWithoutIdentUserName;
+    private ImageView mClearWithoutIdentUser;
+    private Spinner mGeoprivacy;
+    private Spinner mTaxonGeoprivacy;
+    private EditText mFiltersUrl;
+    private View mCopyFiltersUrl;
+    private EditText mMaxAccuracy;
+    private Spinner mOauthApplicationId;
+    private boolean mUpdatingFields = false; // True while we programmatically set the text of the fields above
+    private long mLastUrlEditTime = 0; // When the user last typed in the URL box
     private CheckBox mResearchGradeCheckbox;
     private View mResearchGradeContainer;
     private CheckBox mNeedsIdCheckbox;
@@ -157,6 +173,7 @@ public class ExploreFiltersActivity extends AppCompatActivity {
             case R.id.reset_filters:
                 resetFilters();
                 return true;
+
         }
         return super.onOptionsItemSelected(item);
     }
@@ -204,6 +221,15 @@ public class ExploreFiltersActivity extends AppCompatActivity {
         mUserPic = (ImageView) findViewById(R.id.user_pic);
         mUserName = (TextView) findViewById(R.id.user_name);
         mClearUser = (ImageView) findViewById(R.id.clear_user);
+        mWithoutIdentUserPic = (ImageView) findViewById(R.id.without_ident_user_pic);
+        mWithoutIdentUserName = (TextView) findViewById(R.id.without_ident_user_name);
+        mClearWithoutIdentUser = (ImageView) findViewById(R.id.clear_without_ident_user);
+        mGeoprivacy = (Spinner) findViewById(R.id.geoprivacy);
+        mTaxonGeoprivacy = (Spinner) findViewById(R.id.taxon_geoprivacy);
+        mFiltersUrl = (EditText) findViewById(R.id.filters_url);
+        mCopyFiltersUrl = findViewById(R.id.copy_filters_url);
+        mMaxAccuracy = (EditText) findViewById(R.id.max_accuracy);
+        mOauthApplicationId = (Spinner) findViewById(R.id.oauth_application_id);
         mResearchGradeCheckbox = findViewById(R.id.research_grade_checkbox);
         mResearchGradeContainer = (View) findViewById(R.id.research_grade);
         mResearchGradeLabel = findViewById(R.id.research_grade_label);
@@ -262,6 +288,88 @@ public class ExploreFiltersActivity extends AppCompatActivity {
                 intent.putExtra(ItemSearchActivity.SEARCH_URL, searchUrl);
                 intent.putExtra(ItemSearchActivity.IS_USER, true);
                 startActivityForResult(intent, REQUEST_CODE_SEARCH_USERS);
+            }
+        });
+
+        // Full search URL - can be copied, or edited by hand to add params that have no dedicated filter
+        mCopyFiltersUrl.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                FileUtils.copyToClipBoard(ExploreFiltersActivity.this, mFiltersUrl.getText().toString());
+                Toast.makeText(ExploreFiltersActivity.this, getString(R.string.url_copied_to_clipboard), Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        mFiltersUrl.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) { }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (mUpdatingFields || (mSearchFilters == null)) return;
+
+                // The URL is the source of truth - parse it back into the filters (anything that
+                // isn't a known filter is kept as an extra param), and refresh the rest of the screen
+                mLastUrlEditTime = System.currentTimeMillis();
+                mSearchFilters.applyUrlQueryString(s.toString());
+                refreshViewState();
+            }
+        });
+
+        mMaxAccuracy.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) { }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (mUpdatingFields || (mSearchFilters == null)) return;
+
+                mSearchFilters.maxPositionalAccuracy = parseIntOrNull(s.toString());
+                refreshResetFiltersButton();
+            }
+        });
+
+        mOauthApplicationId.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (mSearchFilters == null) return;
+
+                String value = getResources().getStringArray(R.array.explore_oauth_app_values)[position];
+                mSearchFilters.oauthApplicationId = value.isEmpty() ? null : parseIntOrNull(value);
+                refreshResetFiltersButton();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        mClearWithoutIdentUser.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (mSearchFilters == null) return;
+
+                mSearchFilters.withoutIdentUser = null;
+                refreshViewState();
+            }
+        });
+
+        mWithoutIdentUserName.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String searchUrl = INaturalistService.API_HOST + "/users/autocomplete";
+                Intent intent = new Intent(ExploreFiltersActivity.this, ItemSearchActivity.class);
+                intent.putExtra(ItemSearchActivity.RETURN_RESULT, true);
+                intent.putExtra(ItemSearchActivity.SEARCH_HINT_TEXT, getString(R.string.search_users));
+                intent.putExtra(ItemSearchActivity.SEARCH_URL, searchUrl);
+                intent.putExtra(ItemSearchActivity.IS_USER, true);
+                startActivityForResult(intent, REQUEST_CODE_SEARCH_WITHOUT_IDENT_USERS);
             }
         });
 
@@ -409,6 +517,7 @@ public class ExploreFiltersActivity extends AppCompatActivity {
                 } else {
                     mSearchFilters.qualityGrade.remove(qualityGrade);
                 }
+                refreshResetFiltersButton();
             }
         };
         mResearchGradeCheckbox.setOnCheckedChangeListener(onDataQualityCheckboxChange);
@@ -430,6 +539,7 @@ public class ExploreFiltersActivity extends AppCompatActivity {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 mSearchFilters.hasPhotos = isChecked;
+                refreshResetFiltersButton();
             }
         });
 
@@ -448,6 +558,7 @@ public class ExploreFiltersActivity extends AppCompatActivity {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 mSearchFilters.hasSounds = isChecked;
+                refreshResetFiltersButton();
             }
         });
 
@@ -643,6 +754,36 @@ public class ExploreFiltersActivity extends AppCompatActivity {
             }
         });
 
+        mGeoprivacy.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (mSearchFilters == null) return;
+
+                String value = getResources().getStringArray(R.array.explore_geoprivacy_values)[position];
+                mSearchFilters.geoprivacy = value.isEmpty() ? null : value;
+                refreshResetFiltersButton();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
+        mTaxonGeoprivacy.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if (mSearchFilters == null) return;
+
+                String value = getResources().getStringArray(R.array.explore_geoprivacy_values)[position];
+                mSearchFilters.taxonGeoprivacy = value.isEmpty() ? null : value;
+                refreshResetFiltersButton();
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+
         mAnnotationValue.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -730,6 +871,8 @@ public class ExploreFiltersActivity extends AppCompatActivity {
 
         if (mSearchFilters == null) return;
 
+        resolveAnnotationLabels();
+
         for (int i = 0; i < ICONIC_TAXA.length; i++) {
             iconicTaxa.add(new Pair<>(ICONIC_TAXA[i], mSearchFilters.iconicTaxa.contains(ICONIC_TAXA[i])));
         }
@@ -808,6 +951,35 @@ public class ExploreFiltersActivity extends AppCompatActivity {
                 mShowMyObservationsCheckbox.setChecked(false);
             }
         }
+
+        if (mSearchFilters.withoutIdentUser == null) {
+            mClearWithoutIdentUser.setVisibility(View.GONE);
+            mWithoutIdentUserName.setText("");
+            mWithoutIdentUserPic.setImageResource(R.drawable.ic_account_circle_black_48dp);
+            mWithoutIdentUserPic.setColorFilter(Color.parseColor("#5D5D5D"));
+        } else {
+            mClearWithoutIdentUser.setVisibility(View.VISIBLE);
+            BindingAdapterUtils.increaseTouch(mClearWithoutIdentUser, 80);
+            mWithoutIdentUserName.setText(mSearchFilters.withoutIdentUser.optString("login"));
+            mWithoutIdentUserPic.setColorFilter(null);
+
+            String iconUrl = mSearchFilters.withoutIdentUser.has("icon") ? mSearchFilters.withoutIdentUser.optString("icon") : mSearchFilters.withoutIdentUser.optString("icon_url");
+            if ((iconUrl == null) || (iconUrl.length() == 0)) {
+                mWithoutIdentUserPic.setImageResource(R.drawable.ic_account_circle_black_48dp);
+            } else {
+                Picasso.with(this).
+                        load(iconUrl).
+                        placeholder(R.drawable.ic_account_circle_black_48dp).
+                        fit().
+                        centerCrop().
+                        transform(new UserActivitiesAdapter.CircleTransform()).
+                        into(mWithoutIdentUserPic);
+            }
+        }
+
+        List<String> geoprivacyValues = Arrays.asList(getResources().getStringArray(R.array.explore_geoprivacy_values));
+        mGeoprivacy.setSelection(Math.max(0, geoprivacyValues.indexOf(mSearchFilters.geoprivacy != null ? mSearchFilters.geoprivacy : "")));
+        mTaxonGeoprivacy.setSelection(Math.max(0, geoprivacyValues.indexOf(mSearchFilters.taxonGeoprivacy != null ? mSearchFilters.taxonGeoprivacy : "")));
 
         mResearchGradeCheckbox.setChecked(mSearchFilters.qualityGrade.contains(ExploreSearchFilters.QUALITY_GRADE_RESEARCH));
         mNeedsIdCheckbox.setChecked(mSearchFilters.qualityGrade.contains(ExploreSearchFilters.QUALITY_GRADE_NEEDS_ID));
@@ -898,7 +1070,74 @@ public class ExploreFiltersActivity extends AppCompatActivity {
         List<String> sortByOrder = Arrays.asList(getResources().getStringArray(R.array.explore_order_values));
         mSortByOrder.setSelection(sortByOrder.indexOf(mSearchFilters.order));
 
+        // Precision limit + app id (don't touch the text while the user is typing in it)
+        mUpdatingFields = true;
+        setTextIfChanged(mMaxAccuracy, mSearchFilters.maxPositionalAccuracy);
+        mUpdatingFields = false;
+
+        List<String> oauthAppValues = Arrays.asList(getResources().getStringArray(R.array.explore_oauth_app_values));
+        mOauthApplicationId.setSelection(Math.max(0, oauthAppValues.indexOf(mSearchFilters.oauthApplicationId != null ? String.valueOf(mSearchFilters.oauthApplicationId) : "")));
+
         refreshResetFiltersButton();
+    }
+
+    // The URL can be edited to contain annotation ids without labels - fill the labels back in
+    private void resolveAnnotationLabels() {
+        if ((mSearchFilters == null) || (mAllAnnotations == null) || (mSearchFilters.annotationNameId == null)) return;
+
+        for (int i = 0; i < mAllAnnotations.getJSONArray().length(); i++) {
+            JSONObject annotation = mAllAnnotations.getJSONArray().optJSONObject(i);
+            if ((annotation == null) || (annotation.optInt("id") != mSearchFilters.annotationNameId)) continue;
+
+            if (mSearchFilters.annotationName == null) {
+                mSearchFilters.annotationName = AnnotationsAdapter.getAnnotationTranslatedValue(mApp, annotation.optString("label"), false);
+            }
+
+            JSONArray values = annotation.optJSONArray("values");
+            if ((values != null) && (mSearchFilters.annotationValueId != null) && (mSearchFilters.annotationValue == null)) {
+                for (int j = 0; j < values.length(); j++) {
+                    JSONObject value = values.optJSONObject(j);
+                    if ((value != null) && (value.optInt("id") == mSearchFilters.annotationValueId)) {
+                        mSearchFilters.annotationValue = AnnotationsAdapter.getAnnotationTranslatedValue(mApp, value.optString("label"), true);
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    private static Integer parseIntOrNull(String text) {
+        try {
+            return Integer.valueOf(text.trim());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void setTextIfChanged(EditText editText, Integer value) {
+        String newText = value == null ? "" : String.valueOf(value);
+        if (!editText.getText().toString().equals(newText)) {
+            editText.setText(newText);
+        }
+    }
+
+    // The full search URL that matches the current filters
+    private String getFiltersUrl() {
+        return INaturalistService.HOST + "/observations?" + mSearchFilters.toUrlQueryString();
+    }
+
+    private void refreshUrlText() {
+        if (mSearchFilters == null) return;
+
+        // Don't rewrite (and re-order) what the user is currently typing
+        if ((System.currentTimeMillis() - mLastUrlEditTime) < 1500) return;
+
+        String url = getFiltersUrl();
+        if (!mFiltersUrl.getText().toString().equals(url)) {
+            mUpdatingFields = true;
+            mFiltersUrl.setText(url);
+            mUpdatingFields = false;
+        }
     }
 
     private void refreshResetFiltersButton() {
@@ -907,6 +1146,8 @@ public class ExploreFiltersActivity extends AppCompatActivity {
         if (mResetFilters != null) {
             mResetFilters.setEnabled(mSearchFilters.isDirty());
         }
+
+        refreshUrlText();
     }
 
     private String monthToString(int month) {
@@ -933,6 +1174,7 @@ public class ExploreFiltersActivity extends AppCompatActivity {
         if (mSearchFilters == null) return;
 
         mSearchFilters.resetToDefault();
+        mLastUrlEditTime = 0; // Make sure the URL box gets refreshed right away
         refreshViewState();
     }
 
@@ -1011,6 +1253,15 @@ public class ExploreFiltersActivity extends AppCompatActivity {
             if (resultCode == RESULT_OK) {
                 try {
                     mSearchFilters.project = new JSONObject(data.getStringExtra(ItemSearchActivity.RESULT));
+                    refreshViewState();
+                } catch (JSONException e) {
+                    Logger.tag(TAG).error(e);
+                }
+            }
+        } else if (requestCode == REQUEST_CODE_SEARCH_WITHOUT_IDENT_USERS) {
+            if (resultCode == RESULT_OK) {
+                try {
+                    mSearchFilters.withoutIdentUser = new JSONObject(data.getStringExtra(ItemSearchActivity.RESULT));
                     refreshViewState();
                 } catch (JSONException e) {
                     Logger.tag(TAG).error(e);

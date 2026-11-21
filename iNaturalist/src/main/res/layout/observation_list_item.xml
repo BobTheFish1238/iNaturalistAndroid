@@ -67,6 +67,23 @@
         />
 
     <TextView
+        android:id="@+id/is_research_grade"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:minWidth="20dp"
+        android:paddingLeft="2dp"
+        android:paddingRight="2dp"
+        android:background="@color/inatapptheme_color"
+        android:textColor="#ffffff"
+        android:text="@string/research_grade_initials"
+        android:gravity="center"
+        android:textSize="9sp"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="@id/observation_pic"
+        app:layout_constraintTop_toTopOf="@id/observation_pic"
+        />
+
+    <TextView
         android:id="@+id/date"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

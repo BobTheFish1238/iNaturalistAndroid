@@ -398,6 +398,7 @@ class ObservationCursorAdapter extends SimpleCursorAdapter implements AbsListVie
         public View progress;
         public View progressInner;
         public View soundsIndicator;
+        public View researchGradeIndicator;
 
         public ImageView commentIcon;
         public ImageView idIcon;
@@ -438,6 +439,7 @@ class ObservationCursorAdapter extends SimpleCursorAdapter implements AbsListVie
             progressInner = view.findViewById(R.id.progress_inner);
 
             soundsIndicator = view.findViewById(R.id.has_sounds);
+            researchGradeIndicator = view.findViewById(R.id.is_research_grade);
         }
 
     }
@@ -523,6 +525,13 @@ class ObservationCursorAdapter extends SimpleCursorAdapter implements AbsListVie
             view.setTag(holder);
         } else {
             holder = (ViewHolder) view.getTag();
+        }
+
+        // Research grade badge (same as the Explore grid)
+        if (holder.researchGradeIndicator != null) {
+            int qualityGradeIdx = c.getColumnIndex(Observation.QUALITY_GRADE);
+            String qualityGrade = qualityGradeIdx >= 0 ? c.getString(qualityGradeIdx) : null;
+            holder.researchGradeIndicator.setVisibility("research".equals(qualityGrade) ? View.VISIBLE : View.GONE);
         }
 
         ViewGroup checkboxContainer = holder.checkboxContainer;
